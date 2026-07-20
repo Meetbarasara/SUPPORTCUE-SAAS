@@ -8,7 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "cd frontend && npm install && npm run build && cd ../backend && npm install --omit=dev",
+    "build": "cd frontend && npm install --include=dev && npm run build && cd ../backend && npm install --omit=dev",
     "start": "cd backend && node server.js",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
