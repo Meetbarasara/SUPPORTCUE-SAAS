@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "seed:superuser": "node src/scripts/seedSuperuser.js",
     "reset:superuser": "node reset-superuser.js",
+    "setup:vector-index": "node src/scripts/createVectorIndex.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {

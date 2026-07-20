@@ -13,6 +13,7 @@
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
     "seed:superuser": "npm run seed:superuser --prefix backend",
-    "reset:superuser": "npm run reset:superuser --prefix backend"
+    "reset:superuser": "npm run reset:superuser --prefix backend",
+    "setup:vector-index": "npm run setup:vector-index --prefix backend"
   }
 }
