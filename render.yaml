@@ -11,8 +11,11 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm run build
-    startCommand: npm start
+    # Explicit `cd` rather than `npm --prefix`: --prefix sets npm's config
+    # directory but does not reliably put the package's node_modules/.bin on
+    # PATH, so `vite` is not found and the build exits 127.
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install --omit=dev
+    startCommand: cd backend && node server.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV

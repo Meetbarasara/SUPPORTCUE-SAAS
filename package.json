@@ -8,12 +8,12 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "npm install --prefix frontend && npm run build --prefix frontend && npm install --omit=dev --prefix backend",
-    "start": "npm start --prefix backend",
-    "dev:backend": "npm run dev --prefix backend",
-    "dev:frontend": "npm run dev --prefix frontend",
-    "seed:superuser": "npm run seed:superuser --prefix backend",
-    "reset:superuser": "npm run reset:superuser --prefix backend",
-    "setup:vector-index": "npm run setup:vector-index --prefix backend"
+    "build": "cd frontend && npm install && npm run build && cd ../backend && npm install --omit=dev",
+    "start": "cd backend && node server.js",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "seed:superuser": "cd backend && npm run seed:superuser",
+    "reset:superuser": "cd backend && npm run reset:superuser",
+    "setup:vector-index": "cd backend && npm run setup:vector-index"
   }
 }
