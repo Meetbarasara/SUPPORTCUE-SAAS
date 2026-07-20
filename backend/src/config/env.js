@@ -1,7 +1,22 @@
 require('dotenv').config();
 
-if (!process.env.JWT_SECRET) {
-  console.warn('[ENV] WARNING: JWT_SECRET is not set. Using insecure default — set it in .env for production!');
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// In production, refuse to start on missing secrets rather than silently
+// falling back to the well-known development defaults below — those values
+// are public, so anyone could mint valid tokens against this deployment.
+if (IS_PRODUCTION) {
+  const missing = ['MONGO_URI', 'JWT_SECRET', 'WIDGET_SECRET'].filter(k => !process.env[k]);
+  if (missing.length > 0) {
+    console.error(`[ENV] FATAL: missing required variable(s) in production: ${missing.join(', ')}`);
+    console.error('[ENV] Generate a secret with:');
+    console.error('[ENV]   node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+    process.exit(1);
+  }
+} else {
+  if (!process.env.JWT_SECRET) {
+    console.warn('[ENV] WARNING: JWT_SECRET is not set. Using an insecure development default.');
+  }
 }
 
 if (!process.env.GEMINI_API_KEY) {
