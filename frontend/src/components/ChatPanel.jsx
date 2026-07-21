@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send, User, Bot, Shield, MessageCircle, Sparkles } from "lucide-react";
+import { customerLabel } from "../lib/customer";
 
 const ChatPanel = ({ selectedChat, messages, onSendMessage, onTakeOver, currentUser, isTyping }) => {
   const [inputText, setInputText] = useState("");
@@ -56,7 +57,7 @@ const ChatPanel = ({ selectedChat, messages, onSendMessage, onTakeOver, currentU
 
   const getSenderName = (senderRole, senderId) => {
     if (senderRole === "ai") return "AI Assistant";
-    if (senderRole === "customer") return selectedChat?.customer?.name || "Customer";
+    if (senderRole === "customer") return customerLabel(selectedChat);
     if (senderId === currentUser?._id) return "You";
     return "Agent";
   };
@@ -102,7 +103,7 @@ const ChatPanel = ({ selectedChat, messages, onSendMessage, onTakeOver, currentU
           </div>
           <div>
             <h3 className="text-[15px] font-semibold tracking-tight">
-              {selectedChat.customer?.name || "Customer"}
+              {customerLabel(selectedChat)}
             </h3>
             <div className="flex items-center gap-2 mt-0.5">
               <span
@@ -113,7 +114,6 @@ const ChatPanel = ({ selectedChat, messages, onSendMessage, onTakeOver, currentU
                 {isAI ? <Bot className="h-3 w-3" /> : <Shield className="h-3 w-3" />}
                 {isAI ? "AI MODE" : "HUMAN MODE"}
               </span>
-              <span className="text-[11px] text-slate-500">{selectedChat.customer?.email}</span>
             </div>
           </div>
         </div>

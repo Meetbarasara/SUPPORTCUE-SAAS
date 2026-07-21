@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MessageCircle, User, Bot, RefreshCw } from "lucide-react";
 import { chatAPI } from "../api/api";
+import { customerLabel } from "../lib/customer";
 
 const LeftSidebar = ({ selectedChat, onChatSelect, currentUser, refreshTrigger }) => {
   const [chats, setChats] = useState([]);
@@ -117,7 +118,7 @@ const LeftSidebar = ({ selectedChat, onChatSelect, currentUser, refreshTrigger }
                           {isAI ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}
                         </div>
                         <h3 className="text-[13px] font-semibold text-slate-100 truncate">
-                          {chat.customer?.name || "Unknown"}
+                          {customerLabel(chat)}
                         </h3>
                       </div>
                       <p className="text-[12px] text-slate-400 truncate ml-8">

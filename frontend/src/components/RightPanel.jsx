@@ -1,5 +1,6 @@
 import React from "react";
-import { User, Mail, MessageCircle, CheckCircle, Bot, Shield } from "lucide-react";
+import { User, Hash, MessageCircle, CheckCircle, Bot, Shield } from "lucide-react";
+import { customerLabel, customerId } from "../lib/customer";
 
 const RightPanel = ({ selectedChat, currentUser, onCloseChat }) => {
   if (!selectedChat) {
@@ -28,7 +29,7 @@ const RightPanel = ({ selectedChat, currentUser, onCloseChat }) => {
     <div className="w-80 glass-subtle flex flex-col rounded-none border-y-0 border-r-0">
       <div className="p-4 border-b border-white/10">
         <h2 className="text-[15px] font-semibold tracking-tight">Context</h2>
-        <p className="text-[11px] text-slate-500 mt-0.5">{selectedChat.customer?.name || "Customer"}</p>
+        <p className="text-[11px] text-slate-500 mt-0.5">{customerLabel(selectedChat)}</p>
       </div>
 
       {/* Customer card */}
@@ -39,13 +40,15 @@ const RightPanel = ({ selectedChat, currentUser, onCloseChat }) => {
               <User className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold truncate">{selectedChat.customer?.name || "Unknown"}</p>
+              <p className="text-[13px] font-semibold truncate">{customerLabel(selectedChat)}</p>
               <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Customer</p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-[12px] text-slate-400">
-            <Mail className="h-3.5 w-3.5" />
-            <span className="truncate">{selectedChat.customer?.email || "No email"}</span>
+            <Hash className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate font-mono text-[11px]" title={customerId(selectedChat) || undefined}>
+              {customerId(selectedChat) || "No visitor ID"}
+            </span>
           </div>
         </div>
       </div>
