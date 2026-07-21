@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Login from './components/Login';
 import Dashboard from './pages/Dashboard';
 import CompanySetup from './pages/CompanySetup';
+import AgentSetup from './pages/AgentSetup';
 
 // Protected Route component
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -65,6 +66,7 @@ function App() {
           <Route path="/" element={<Home user={user} onLogout={handleLogout} />} />
           <Route path="/login" element={<Login setUser={setUser} />} />
           <Route path="/company-setup" element={<CompanySetup />} />
+          <Route path="/agent-setup" element={<AgentSetup />} />
           
           {/* Protected routes */}
           <Route 

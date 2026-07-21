@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { chatAPI, kbAPI } from "../api/api";
+import { chatAPI, kbAPI, agentAPI } from "../api/api";
 
 // ─── Icon SVGs (inline for zero dependency) ─────────────────────────────────
 const Icons = {
@@ -35,6 +35,9 @@ const Icons = {
   ),
   Code: () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+  ),
+  Users: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
   ),
 };
 
@@ -87,6 +90,9 @@ const CompanyDashboard = ({ user, onLogout }) => {
             <TabBtn active={activeTab === "chats"} onClick={() => setActiveTab("chats")}>
               <Icons.MessageSquare /> Chat History
             </TabBtn>
+            <TabBtn active={activeTab === "agents"} onClick={() => setActiveTab("agents")}>
+              <Icons.Users /> Agents
+            </TabBtn>
             <TabBtn active={activeTab === "integration"} onClick={() => setActiveTab("integration")}>
               <Icons.Code /> Integration
             </TabBtn>
@@ -99,7 +105,10 @@ const CompanyDashboard = ({ user, onLogout }) => {
       </header>
 
       <main className="max-w-[1200px] mx-auto px-6 py-8">
-        {activeTab === "kb" ? <KnowledgeBaseTab /> : activeTab === "chats" ? <ChatHistoryTab /> : <IntegrationTab user={user} />}
+        {activeTab === "kb" ? <KnowledgeBaseTab />
+          : activeTab === "chats" ? <ChatHistoryTab />
+          : activeTab === "agents" ? <AgentsTab />
+          : <IntegrationTab user={user} />}
       </main>
     </div>
   );
@@ -492,6 +501,164 @@ const ChatHistoryTab = () => {
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+const AgentsTab = () => {
+  const [agents, setAgents] = useState([]);
+  const [invites, setInvites] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  // The invitation link is shown once here, because no email is sent unless
+  // SMTP is configured — closing without it would strand the invitee.
+  const [lastLink, setLastLink] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const load = async () => {
+    try {
+      const res = await agentAPI.list();
+      setAgents(res.data.agents || []);
+      setInvites(res.data.invites || []);
+    } catch (e) {
+      setError("Could not load your team.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setSending(true);
+    setError("");
+    try {
+      const res = await agentAPI.invite(email.trim());
+      setLastLink({ email: email.trim(), url: res.data.invitationUrl });
+      setEmail("");
+      setCopied(false);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.error || "Could not send the invitation.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleRevoke = async (id) => {
+    try {
+      await agentAPI.revokeInvite(id);
+      load();
+    } catch {
+      setError("Could not revoke that invitation.");
+    }
+  };
+
+  const copyLink = async () => {
+    if (!lastLink) return;
+    try {
+      await navigator.clipboard.writeText(lastLink.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Copy failed — select the link and copy it manually.");
+    }
+  };
+
+  return (
+    <div className="animate-fade-slide">
+      <h2 className="text-xl font-bold tracking-tight mb-1">Agents</h2>
+      <p className="text-[13px] text-slate-400 mb-5">
+        Agents can see your conversations and reply to your customers, so they join by invitation only.
+      </p>
+
+      <div className="glass-card p-6 max-w-3xl mb-6">
+        <h3 className="text-[15px] font-bold mb-3">Invite an agent</h3>
+        <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="colleague@yourcompany.com"
+            className="input-glass flex-1 text-[14px]"
+          />
+          <button type="submit" disabled={sending} className="btn-accent rounded-xl px-5 py-2.5 text-[13px] whitespace-nowrap">
+            {sending ? "Sending…" : "Send invitation"}
+          </button>
+        </form>
+
+        {error && <div className="pill-error rounded-xl px-4 py-2.5 text-[13px] mt-3">{error}</div>}
+
+        {lastLink && (
+          <div className="mt-4 p-4 rounded-xl" style={{ background: "rgba(34,211,238,0.08)", border: "1px solid rgba(34,211,238,0.2)" }}>
+            <p className="text-[12px] text-slate-300 mb-2">
+              Invitation for <strong>{lastLink.email}</strong>. This link is shown once and expires in 7 days.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-[11px] font-mono text-slate-300 bg-black/30 rounded-lg px-3 py-2 truncate">
+                {lastLink.url}
+              </code>
+              <button onClick={copyLink} className="bg-white/10 hover:bg-white/20 transition-colors px-3 py-2 rounded-lg text-[11px] font-semibold whitespace-nowrap">
+                {copied ? "Copied!" : "Copy link"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="glass-card p-8 max-w-3xl text-center text-slate-500 text-sm">Loading…</div>
+      ) : (
+        <div className="max-w-3xl flex flex-col gap-6">
+          <div className="glass-card p-6">
+            <h3 className="text-[15px] font-bold mb-4">Your team · {agents.length}</h3>
+            {agents.length === 0 ? (
+              <p className="text-[13px] text-slate-500">No agents yet. Invite someone above.</p>
+            ) : (
+              <div className="flex flex-col divide-y divide-white/5">
+                {agents.map((a) => (
+                  <div key={a._id} className="flex items-center justify-between py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold truncate">{a.name}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{a.email}</p>
+                    </div>
+                    <span className="pill-success px-2.5 py-1 rounded-full text-[11px] font-semibold">Active</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {invites.length > 0 && (
+            <div className="glass-card p-6">
+              <h3 className="text-[15px] font-bold mb-4">Pending invitations · {invites.length}</h3>
+              <div className="flex flex-col divide-y divide-white/5">
+                {invites.map((i) => (
+                  <div key={i._id} className="flex items-center justify-between py-2.5 gap-3">
+                    <p className="text-[13px] truncate min-w-0">{i.email}</p>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`${i.expired ? "pill-error" : "pill-warning"} px-2.5 py-1 rounded-full text-[11px] font-semibold`}>
+                        {i.expired ? "Expired" : "Pending"}
+                      </span>
+                      <button
+                        onClick={() => handleRevoke(i._id)}
+                        className="btn-ghost rounded-lg px-2.5 py-1.5 text-[11px]"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -9,60 +9,10 @@ const generateToken = (userId) => {
   return jwt.sign({ userId }, config.JWT_SECRET, { expiresIn: '7d' });
 };
 
-// Register new user
-const register = async (req, res) => {
-  try {
-    const { name, email, password, role = 'agent' } = req.body;
-
-    // Validation
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
-    }
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: 'User with this email already exists' });
-    }
-
-    // Allow only valid roles. Superuser can only be created via seed script or by an existing superuser.
-    const allowedPublicRoles = ['agent'];
-    const safeRole = allowedPublicRoles.includes(role) ? role : 'agent';
-
-    if (safeRole === 'agent' && !req.body.companyId) {
-      return res.status(400).json({ error: 'Company ID is required for agent registration' });
-    }
-
-    // Create new user
-    const user = new User({
-      name,
-      email,
-      password, // Virtual setter will hash the password
-      role: safeRole,
-      companyId: req.body.companyId || null
-    });
-
-    await user.save();
-
-    // Generate token
-    const token = generateToken(user._id);
-
-    // Return user info (without password) and token
-    res.status(201).json({
-      message: 'User registered successfully',
-      user: user.toPublicJSON(),
-      token
-    });
-
-  } catch (error) {
-    console.error('Registration error:', error.message);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
+// Agent accounts are created by redeeming an invitation — see
+// controllers/agentInviteController.js. There is no public registration:
+// the old one took a companyId straight from the request body, and that id is
+// printed in the widget embed snippet on every customer's public website.
 
 // Login user
 const login = async (req, res) => {
@@ -216,7 +166,6 @@ const companyLogin = async (req, res) => {
 };
 
 module.exports = {
-  register,
   login,
   getProfile,
   logout,

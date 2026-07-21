@@ -16,6 +16,7 @@ const companyRoutes = require('./src/routes/companyRoutes');
 const knowledgeBaseRoutes = require('./src/routes/knowledgeBaseRoutes');
 const customerRoutes = require('./src/routes/customerRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
+const agentRoutes = require('./src/routes/agentRoutes');
 
 // Import socket handler
 const ChatSocketHandler = require('./src/socket');
@@ -101,6 +102,7 @@ app.use('/api/auth', dashboardCors, strictLimiter, authRoutes);
 app.use('/api/company', dashboardCors, strictLimiter, companyRoutes);
 app.use('/api/kb', dashboardCors, strictLimiter, knowledgeBaseRoutes);
 app.use('/api/notifications', dashboardCors, strictLimiter, notificationRoutes);
+app.use('/api/agents', dashboardCors, strictLimiter, agentRoutes);
 
 // ── Health check ──
 app.get('/health', (req, res) => {

@@ -138,6 +138,59 @@ const sendCompanyInvitation = async (toEmail, companyName, setupUrl) => {
   }
 };
 
+const sendAgentInvitation = async (toEmail, companyName, setupUrl) => {
+  const mailTransporter = createTransporter();
+
+  if (!mailTransporter) {
+    console.warn(`[EmailService] Skipping email to ${toEmail} because SMTP is not configured.`);
+    return false;
+  }
+
+  const htmlTemplate = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <title>Join ${companyName} on SupportCue</title>
+  </head>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color:#0f172a; color:#f8fafc; margin:0; padding:0;">
+    <div style="max-width:600px; margin:40px auto; padding:40px; background:linear-gradient(145deg, rgba(30,41,59,0.7), rgba(15,23,42,0.9)); border:1px solid rgba(255,255,255,0.1); border-radius:24px;">
+      <div style="text-align:center; margin-bottom:30px;">
+        <span style="font-size:24px; font-weight:800; color:#22d3ee;">SupportCue</span>
+      </div>
+      <div style="background-color:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:16px; padding:30px; text-align:center;">
+        <h1 style="color:#f8fafc; font-size:20px; margin-top:0; margin-bottom:15px;">You've been invited to join ${companyName}</h1>
+        <p style="color:#cbd5e1; font-size:15px; line-height:1.6; margin-bottom:25px;">
+          You'll be able to see incoming conversations, take over from the AI assistant, and reply to customers directly.
+        </p>
+        <a href="${setupUrl}" style="display:inline-block; background:linear-gradient(to right, #0ea5e9, #6366f1); color:#ffffff !important; text-decoration:none; font-weight:600; padding:12px 30px; border-radius:12px; font-size:15px;">Create your account</a>
+        <p style="color:#64748b; font-size:12px; margin-top:22px; margin-bottom:0;">This link expires in 7 days and can be used once.</p>
+      </div>
+      <div style="text-align:center; margin-top:30px; font-size:12px; color:#64748b;">
+        &copy; ${new Date().getFullYear()} SupportCue.<br>
+        If you weren't expecting this invitation, you can ignore this email.
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+
+  try {
+    await mailTransporter.sendMail({
+      from: '"SupportCue" <' + config.SMTP_USER + '>',
+      to: toEmail,
+      subject: `Join ${companyName} on SupportCue`,
+      html: htmlTemplate,
+    });
+    console.log(`[EmailService] Agent invitation sent to ${toEmail}`);
+    return true;
+  } catch (error) {
+    console.error(`[EmailService] Failed to send email to ${toEmail}:`, error.message);
+    return false;
+  }
+};
+
 module.exports = {
-  sendCompanyInvitation
+  sendCompanyInvitation,
+  sendAgentInvitation
 };

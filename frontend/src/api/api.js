@@ -37,13 +37,22 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  register: (userData) => api.post('/auth/register', userData),
+  // No register(): agents are created by redeeming an invitation, below.
   login: (credentials) => api.post('/auth/login', credentials),
   getProfile: () => api.get('/auth/profile'),
   logout: () => api.post('/auth/logout'),
   acceptCompanyInvite: (token, password) => api.post('/auth/company/accept-invite', { token, password }),
   verifyCompanyInvite: (token) => api.get(`/auth/company/verify-invite?token=${token}`),
   companyLogin: (credentials) => api.post('/auth/company/login', credentials),
+  verifyAgentInvite: (token) => api.get(`/auth/agent/verify-invite?token=${encodeURIComponent(token)}`),
+  acceptAgentInvite: (token, name, password) => api.post('/auth/agent/accept-invite', { token, name, password }),
+};
+
+// Agent management (company authenticated)
+export const agentAPI = {
+  list: () => api.get('/agents'),
+  invite: (email) => api.post('/agents/invite', { email }),
+  revokeInvite: (id) => api.delete(`/agents/invite/${id}`),
 };
 
 // Customer API
