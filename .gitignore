@@ -1,11 +1,11 @@
 # Dependencies
 node_modules/
 
-# Environment files — NEVER commit these, they contain secrets
+# Environment files — NEVER commit these, they contain secrets.
+# Broad pattern so backups/variants (.env.backup, .env.old) can't slip through.
 .env
-.env.local
-.env.production
-.env.staging
+.env.*
+!.env.example
 
 # Build output
 dist/
