@@ -1,34 +1,25 @@
 const User = require('../../models/User');
-const Chat = require('../../models/Chat');
+const authorizeChat = require('../authorizeChat');
 
 module.exports = (socket, io) => {
   // ── Join a specific chat room ──
   socket.on('joinChat', async (data) => {
     try {
-      const { chatId, userId } = data;
+      const { chatId } = data || {};
 
-      if (!chatId || !userId) {
-        socket.emit('error', { message: 'Chat ID and User ID are required' });
+      // Same check as sendMessage: joining is a read, and the room is where
+      // live messages arrive. Agents used to be unchecked here entirely, so
+      // any agent could join any company's chat and receive its history.
+      const auth = await authorizeChat(socket, chatId);
+      if (!auth.ok) {
+        socket.emit('error', { message: auth.error });
         return;
       }
 
-      // Verify the chat exists and the user has access
-      const chat = await Chat.findById(chatId).lean();
-      if (!chat) {
-        socket.emit('error', { message: 'Chat not found' });
-        return;
-      }
-
-      // Customers can only join their own chats
-      if (socket.data.role === 'customer') {
-        if (chat.customerId !== userId && chat.customerId !== socket.data.customerId) {
-          socket.emit('error', { message: 'Access denied to this chat' });
-          return;
-        }
-      }
+      const { chat } = auth;
 
       socket.join(chatId);
-      console.log(`[Socket] ${socket.data.role} (${userId}) joined chat ${chatId}`);
+      console.log(`[Socket] ${auth.role} (${auth.senderId}) joined chat ${chatId}`);
 
       // Send chat history to the joining socket
       const lastMessages = chat.messages ? chat.messages.slice(-15) : [];
@@ -61,16 +52,14 @@ module.exports = (socket, io) => {
   });
 
   // ── Join agent/superuser room ──
-  socket.on('joinAgents', async (data) => {
+  socket.on('joinAgents', async () => {
     try {
-      const { userId } = data;
+      // Use the socket's own identity, not a userId from the payload. This
+      // handler used to look up whatever id the client sent, so an agent could
+      // pass another company's agent id and join that company's room —
+      // receiving its escalation alerts and chat updates.
+      const userId = socket.data.userId;
       if (!userId) {
-        socket.emit('error', { message: 'User ID is required' });
-        return;
-      }
-
-      // The socket must be authenticated as an agent or superuser
-      if (socket.data.role === 'customer') {
         socket.emit('error', { message: 'Access denied. Customers cannot join agent rooms.' });
         return;
       }
@@ -102,8 +91,11 @@ module.exports = (socket, io) => {
 
   // ── Typing indicator ──
   socket.on('typing', (data) => {
-    const { chatId, userId, isTyping } = data;
-    if (!chatId) return;
+    const { chatId, userId, isTyping } = data || {};
+    // socket.to() broadcasts to a room whether or not this socket is in it,
+    // so require membership — which joinChat now only grants after the
+    // tenant check above.
+    if (!chatId || !socket.rooms.has(chatId)) return;
     socket.to(chatId).emit('userTyping', { userId, isTyping });
   });
 };

@@ -1,61 +1,46 @@
-const mongoose = require('mongoose');
 const Chat = require('../../models/Chat');
 const Company = require('../../models/Company');
 const Notification = require('../../models/Notification');
 const geminiService = require('../../services/geminiService');
 const ragService = require('../../services/ragService');
+const authorizeChat = require('../authorizeChat');
+
+const MAX_MESSAGE_LENGTH = 4000;
 
 module.exports = (socket, io) => {
   socket.on('sendMessage', async (payload) => {
     try {
-      const { chatId, senderId, senderRole, text } = payload;
+      const { chatId, text } = payload || {};
 
-      // Validation
-      if (!chatId || !senderRole || !text) {
-        socket.emit('error', { message: 'Chat ID, sender role, and text are required' });
+      if (typeof text !== 'string' || !text.trim()) {
+        socket.emit('error', { message: 'Message text is required' });
         return;
       }
 
-      if (senderRole !== 'ai' && !senderId) {
-        socket.emit('error', { message: 'Sender ID is required for non-AI messages' });
+      if (text.length > MAX_MESSAGE_LENGTH) {
+        socket.emit('error', { message: 'Message is too long' });
         return;
       }
 
-      // ── Security: Validate sender matches authenticated socket user ──
-      if (senderRole === 'customer') {
-        const authenticatedCustomer = socket.data.customerId;
-        if (authenticatedCustomer && authenticatedCustomer !== senderId) {
-          socket.emit('error', { message: 'Sender ID mismatch' });
-          return;
-        }
-      } else if (senderRole === 'agent') {
-        const authenticatedAgent = socket.data.userId;
-        if (authenticatedAgent && authenticatedAgent !== senderId) {
-          socket.emit('error', { message: 'Agent ID mismatch' });
-          return;
-        }
-      }
-
-      const chat = await Chat.findById(chatId).lean();
-      if (!chat) {
-        socket.emit('error', { message: 'Chat not found' });
+      // Who is sending, and may they write here? Both answers come from the
+      // socket's own identity — the payload's `senderId`/`senderRole` are
+      // ignored, so a socket cannot claim to be someone else. AI messages are
+      // only ever appended server-side, below.
+      const auth = await authorizeChat(socket, chatId);
+      if (!auth.ok) {
+        socket.emit('error', { message: auth.error });
         return;
       }
+
+      const { chat, role: senderRole, senderId } = auth;
 
       if (chat.status === 'closed') {
         socket.emit('error', { message: 'This chat is closed' });
         return;
       }
 
-      const effectiveSenderId = senderRole === 'customer' ? chat.customerId : senderId;
-
-      if (senderRole === 'agent' && (!effectiveSenderId || !mongoose.Types.ObjectId.isValid(effectiveSenderId))) {
-        socket.emit('error', { message: 'Valid Agent ID is required' });
-        return;
-      }
-
       const messageData = {
-        senderId: senderRole === 'ai' ? undefined : effectiveSenderId,
+        senderId,
         senderRole,
         text,
         createdAt: new Date()
