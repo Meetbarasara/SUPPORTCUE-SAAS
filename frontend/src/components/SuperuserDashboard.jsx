@@ -10,6 +10,31 @@ const Icons = {
   Plus: () => (<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>),
   X: () => (<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>),
   Logout: () => (<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>),
+  Copy: () => (<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>),
+  Check: () => (<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>),
+};
+
+/** Clipboard write with a fallback for browsers/contexts without the async API. */
+const copyText = async (text) => {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall through to legacy path */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
 };
 
 const Toast = ({ message, type, onClose }) => {
@@ -38,6 +63,8 @@ const CreateCompanyModal = ({ onClose, onCreated }) => {
   const [email, setEmail] = useState("");
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [created, setCreated] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -46,13 +73,67 @@ const CreateCompanyModal = ({ onClose, onCreated }) => {
     try {
       const res = await companyAPI.create({ name: name.trim(), email: email.trim(), systemPrompt: prompt.trim() || undefined });
       onCreated(res.data.company);
-      onClose();
+      // Keep the modal open: the invitation URL is returned only here, and no
+      // email is sent unless SMTP is configured. Closing now would strand the
+      // company with no way to reach setup.
+      setCreated({ company: res.data.company, invitationUrl: res.data.invitationUrl || null });
     } catch (err) {
       alert(err.response?.data?.error || "Failed to create company");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleCopy = async () => {
+    if (!created?.invitationUrl) return;
+    if (await copyText(created.invitationUrl)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (created) {
+    return (
+      <Modal title="Company Created" onClose={onClose}>
+        <div className="flex flex-col gap-4">
+          <p className="text-[13px] text-slate-300">
+            <span className="font-semibold">{created.company.name}</span> is ready. Send the link below to{" "}
+            <span className="font-semibold">{created.company.email}</span> so they can set their password.
+          </p>
+
+          {created.invitationUrl ? (
+            <>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-400 mb-1.5">Setup link</label>
+                <textarea
+                  readOnly
+                  onFocus={(e) => e.target.select()}
+                  value={created.invitationUrl}
+                  className="input-glass w-full text-[12px] font-mono min-h-[72px] break-all"
+                />
+              </div>
+              <button type="button" onClick={handleCopy} className="btn-accent rounded-xl px-4 py-2 text-[13px] inline-flex items-center justify-center gap-1.5 self-start">
+                {copied ? (<><Icons.Check /> Copied</>) : (<><Icons.Copy /> Copy link</>)}
+              </button>
+              <p className="text-[11px] text-slate-500">
+                Copy it now — this is the only time it is shown. It expires in 24 hours, and an email is
+                sent only if SMTP is configured on the server.
+              </p>
+            </>
+          ) : (
+            <p className="text-[12px] pill-error rounded-xl px-3 py-2">
+              The server did not return an invitation link. The company exists, but you will need to
+              recreate it to obtain a setup link.
+            </p>
+          )}
+
+          <div className="flex justify-end mt-2">
+            <button type="button" className="btn-ghost rounded-xl px-4 py-2 text-[13px]" onClick={onClose}>Done</button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal title="Create New Company" onClose={onClose}>
@@ -64,7 +145,7 @@ const CreateCompanyModal = ({ onClose, onCreated }) => {
         <div>
           <label className="block text-[12px] font-semibold text-slate-400 mb-1.5">Company Email *</label>
           <input type="email" className="input-glass w-full text-[14px]" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@acme.com" required />
-          <p className="text-[11px] text-slate-500 mt-1.5">An invitation link will be generated for this email.</p>
+          <p className="text-[11px] text-slate-500 mt-1.5">A setup link will be shown after creation — copy it, it is only displayed once.</p>
         </div>
         <div>
           <label className="block text-[12px] font-semibold text-slate-400 mb-1.5">AI System Prompt</label>
