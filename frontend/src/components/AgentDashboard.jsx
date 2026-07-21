@@ -208,9 +208,9 @@ const AgentDashboard = ({ user, onLogout }) => {
 
   const handleTakeOver = async (chatId) => {
     try {
-      await chatAPI.takeOverChat(chatId, user._id);
+      await chatAPI.takeOverChat(chatId);
       setSelectedChat((prev) => ({ ...prev, mode: "human", assignedAgentId: user._id }));
-      if (socket) socket.emit("takeOver", { chatId, agentId: user._id });
+      if (socket) socket.emit("takeOver", { chatId });
     } catch (error) {
       console.error("Failed to take over chat:", error);
     }

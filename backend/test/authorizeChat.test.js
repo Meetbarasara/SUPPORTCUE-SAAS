@@ -116,6 +116,44 @@ describe('superusers', () => {
   });
 });
 
+describe('userMayAccessChat — the rule REST and sockets share', () => {
+  // takeover and close used to check only that the caller was *an* agent.
+  const { userMayAccessChat } = require('../src/lib/chatAccess');
+
+  test('an agent may act on their own company\'s chat', () => {
+    assert.equal(userMayAccessChat(agentA, chatA), true);
+  });
+
+  test('an agent may NOT act on another company\'s chat', () => {
+    assert.equal(userMayAccessChat(agentB, chatA), false);
+  });
+
+  test('a superuser may act on any chat', () => {
+    assert.equal(userMayAccessChat(superuser, chatA), true);
+    assert.equal(userMayAccessChat(superuser, chatB), true);
+  });
+
+  test('an agent with no company may not act at all', () => {
+    assert.equal(userMayAccessChat(unassignedAgent, chatA), false);
+  });
+
+  test('missing user or chat is a refusal, not a crash', () => {
+    assert.equal(userMayAccessChat(null, chatA), false);
+    assert.equal(userMayAccessChat(agentA, null), false);
+    assert.equal(userMayAccessChat(undefined, undefined), false);
+  });
+
+  test('an unknown role is refused even with a matching company', () => {
+    assert.equal(userMayAccessChat({ role: 'customer', companyId: companyA }, chatA), false);
+    assert.equal(userMayAccessChat({ companyId: companyA }, chatA), false);
+  });
+
+  test('compares ids by value, not by reference', () => {
+    // companyId arrives as an ObjectId from Mongo and as a string elsewhere.
+    assert.equal(userMayAccessChat({ role: 'agent', companyId: String(companyA) }, chatA), true);
+  });
+});
+
 describe('rejects bad input', () => {
   test('socket with no identity at all', async () => {
     const r = await authorizeChat({ data: {} }, String(chatA._id));

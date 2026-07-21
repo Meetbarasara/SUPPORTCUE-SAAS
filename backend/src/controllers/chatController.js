@@ -1,6 +1,6 @@
 const Chat = require('../models/Chat');
-const User = require('../models/User');
 const mongoose = require('mongoose');
+const { userMayAccessChat } = require('../lib/chatAccess');
 
 const CustomerSession = require('../models/CustomerSession');
 const Company = require('../models/Company');
@@ -121,33 +121,31 @@ const getChat = async (req, res) => {
 // Take over chat (switch from AI to human mode)
 const takeOverChat = async (req, res) => {
   try {
-    const { chatId, agentId } = req.body;
+    const { chatId } = req.body;
 
-    // Validation
     if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) {
       return res.status(400).json({ error: 'Valid chat ID is required' });
     }
 
-    if (!agentId || !mongoose.Types.ObjectId.isValid(agentId)) {
-      return res.status(400).json({ error: 'Valid agent ID is required' });
-    }
-
-    // Check if chat exists
     const chat = await Chat.findById(chatId);
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
 
-  // Check if agent exists and has proper role
-  const agent = await User.findById(agentId);
-  if (!agent || agent.role !== 'agent') {
-      return res.status(403).json({ error: 'Invalid agent' });
+    // The agent is whoever is authenticated. `agentId` used to come from the
+    // request body, so one agent could assign a chat to another — and nothing
+    // compared the caller's company to the chat's, so an agent at company A
+    // could seize a conversation at company B.
+    if (!userMayAccessChat(req.user, chat)) {
+      return res.status(403).json({ error: 'Access denied to this chat' });
     }
 
-    // Take over the chat
-    await chat.takeOver(agentId);
+    const agent = req.user;
 
-    // Add system message about takeover
+    // takeOver() writes through findByIdAndUpdate, so the local `chat` is
+    // stale afterwards — use the returned document for the response.
+    const updated = await chat.takeOver(agent._id);
+
     await chat.addMessage({
       senderRole: 'ai',
       text: `This conversation has been transferred to ${agent.name}, a human support agent. They will assist you shortly.`
@@ -156,9 +154,9 @@ const takeOverChat = async (req, res) => {
     res.json({
       message: 'Chat taken over successfully',
       chat: {
-        _id: chat._id,
-        mode: chat.mode,
-        assignedAgentId: chat.assignedAgentId
+        _id: updated._id,
+        mode: updated.mode,
+        assignedAgentId: updated.assignedAgentId
       }
     });
 
@@ -253,6 +251,12 @@ const closeChat = async (req, res) => {
     const chat = await Chat.findById(chatId);
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
+    }
+
+    // Same rule as takeover: being an agent is not enough, it has to be this
+    // company's agent.
+    if (!userMayAccessChat(req.user, chat)) {
+      return res.status(403).json({ error: 'Access denied to this chat' });
     }
 
     chat.status = 'closed';

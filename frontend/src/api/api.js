@@ -67,7 +67,8 @@ export const chatAPI = {
   getChat: (chatId, userId) => api.get(`/chat/${chatId}${userId ? `?userId=${userId}` : ''}`),
   getUserChats: (userId, companyId) => api.get(`/chat/user-chats?userId=${userId}${companyId ? `&companyId=${companyId}` : ''}`),
   getCompanyChats: () => api.get('/chat/company/history'),
-  takeOverChat: (chatId, agentId) => api.post('/chat/takeover', { chatId, agentId }),
+  // The server takes over as whoever is authenticated — it does not accept an agent id.
+  takeOverChat: (chatId) => api.post('/chat/takeover', { chatId }),
   closeChat: (chatId) => api.put(`/chat/${chatId}/close`),
   getActiveChats: () => api.get('/chat/active'),
 };

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Chat = require('../models/Chat');
 const User = require('../models/User');
+const { userMayAccessChat } = require('../lib/chatAccess');
 
 /**
  * Decide who a socket really is, and whether it may read or write `chatId`.
@@ -47,24 +48,14 @@ async function authorizeChat(socket, chatId) {
     return { ok: false, error: 'Access denied to this chat' };
   }
 
-  const user = await User.findById(socket.data.userId, 'role companyId').lean();
-  if (!user) return { ok: false, error: 'Access denied to this chat' };
-
-  // Superusers deliberately span tenants — that is what the 'superusers' room
-  // is for — but the role comes from their user record, not their handshake.
-  if (user.role === 'superuser') {
-    return { ok: true, chat, role: 'agent', senderId: String(user._id) };
-  }
-
-  if (user.role !== 'agent' || !user.companyId) {
+  // `name` is projected because the takeover system message quotes it.
+  const user = await User.findById(socket.data.userId, 'role companyId name').lean();
+  if (!userMayAccessChat(user, chat)) {
     return { ok: false, error: 'Access denied to this chat' };
   }
 
-  if (String(user.companyId) !== String(chat.companyId)) {
-    return { ok: false, error: 'Access denied to this chat' };
-  }
-
-  return { ok: true, chat, role: 'agent', senderId: String(user._id) };
+  // Superusers post as agents — the message enum has no superuser.
+  return { ok: true, chat, role: 'agent', senderId: String(user._id), user };
 }
 
 module.exports = authorizeChat;
