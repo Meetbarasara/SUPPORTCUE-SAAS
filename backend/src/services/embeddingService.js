@@ -8,9 +8,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 class EmbeddingService {
   constructor() {
     this.apiKey = config.GEMINI_API_KEY;
-    // Free-tier embedding quotas are low. Tune without a redeploy via env.
-    this.callDelayMs = Number(process.env.EMBEDDING_DELAY_MS) || 350;
-    this.maxRetries = Number(process.env.EMBEDDING_MAX_RETRIES) || 5;
+    // Free-tier embedding quotas are low and enforced over a rolling window,
+    // so the safe rate is roughly one call per second. Tune via env without a
+    // redeploy if your quota differs.
+    this.callDelayMs = Number(process.env.EMBEDDING_DELAY_MS) || 1100;
+    this.maxRetries = Number(process.env.EMBEDDING_MAX_RETRIES) || 8;
+    this.maxBackoffMs = Number(process.env.EMBEDDING_MAX_BACKOFF_MS) || 60000;
   }
 
   /**
@@ -56,7 +59,7 @@ class EmbeddingService {
       const retryAfter = Number(response.headers.get('retry-after'));
       const backoff = Number.isFinite(retryAfter) && retryAfter > 0
         ? retryAfter * 1000
-        : Math.min(2 ** attempt * 1000, 32000) + Math.floor(Math.random() * 500);
+        : Math.min(2 ** attempt * 1000, this.maxBackoffMs) + Math.floor(Math.random() * 500);
 
       console.warn(`[Embedding] HTTP ${response.status}; retry ${attempt + 1}/${this.maxRetries} in ${Math.round(backoff / 1000)}s`);
       await sleep(backoff);
