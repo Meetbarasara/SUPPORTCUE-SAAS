@@ -135,7 +135,6 @@ const KnowledgeBaseTab = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
-  const [polling, setPolling] = useState(false);
   const fileRef = useRef(null);
 
   const fetchDocs = async () => {
@@ -149,18 +148,23 @@ const KnowledgeBaseTab = () => {
 
   useEffect(() => { fetchDocs(); }, []);
 
+  // Poll while anything is still indexing.
+  //
+  // This used to be gated on a `polling` state flag that was also a dependency
+  // of the effect. Setting it re-ran the effect, which tore the interval down
+  // before its first tick and then failed its own `!polling` guard, so no
+  // interval was ever re-created — the pill sat on "Processing" until the page
+  // was reloaded, however long the backend actually took. The callback also
+  // closed over a stale `documents`, so its exit condition could never become
+  // true. Deriving the boolean and depending on that removes both problems:
+  // the timer starts when work appears and stops when it is gone.
+  const hasProcessing = documents.some((d) => d.status === "processing");
+
   useEffect(() => {
-    const hasProcessing = documents.some((d) => d.status === "processing");
-    if (hasProcessing && !polling) {
-      setPolling(true);
-      const interval = setInterval(async () => {
-        await fetchDocs();
-        const stillProcessing = documents.some((d) => d.status === "processing");
-        if (!stillProcessing) { clearInterval(interval); setPolling(false); }
-      }, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [documents, polling]);
+    if (!hasProcessing) return;
+    const interval = setInterval(fetchDocs, 3000);
+    return () => clearInterval(interval);
+  }, [hasProcessing]);
 
   const handleFile = async (file) => {
     if (!file || file.type !== "application/pdf") { alert("Please upload a PDF file."); return; }
