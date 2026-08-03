@@ -2,6 +2,20 @@ require('dotenv').config();
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
+// Google retires model ids on its own schedule — gemini-2.5-flash began
+// answering 404 "no longer available to new users" months before its announced
+// shutdown date, which silently dropped every reply to the canned fallback.
+// Keep the id in configuration so the next retirement is an env change rather
+// than a code change and redeploy.
+//
+// The default is deliberately a `-lite` model. Gemini 3.x thinking models spend
+// output tokens on reasoning before writing, and against the 150-token budget in
+// geminiService they hit MAX_TOKENS mid-JSON and return unparseable text —
+// measured at 142 and 145 thinking tokens for gemini-3.6-flash and
+// gemini-3.5-flash. The lite models think for 0 tokens and answer cleanly.
+// If you raise GEMINI_MODEL to a thinking model, raise maxOutputTokens with it.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+
 // In production, refuse to start on missing secrets rather than silently
 // falling back to the well-known development defaults below — those values
 // are public, so anyone could mint valid tokens against this deployment.
@@ -29,7 +43,8 @@ module.exports = {
   JWT_SECRET: process.env.JWT_SECRET || 'insecure_dev_jwt_secret_change_in_production',
   WIDGET_SECRET: process.env.WIDGET_SECRET || process.env.JWT_SECRET || 'insecure_dev_widget_secret',
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  GEMINI_BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+  GEMINI_MODEL,
+  GEMINI_BASE_URL: `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
   NODE_ENV: process.env.NODE_ENV || 'development',
   // CORS_ORIGIN: comma-separated list of allowed dashboard origins
   // Widget API routes are open to all origins (needed for embedding)

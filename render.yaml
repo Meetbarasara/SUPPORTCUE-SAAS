@@ -43,6 +43,13 @@ services:
       - key: GEMINI_API_KEY
         sync: false
 
+      # Optional — overrides the default model in src/config/env.js. Set this
+      # when Google retires the current one, rather than editing code. Note that
+      # 3.x non-lite models think before answering and need a larger
+      # maxOutputTokens than geminiService currently sends.
+      - key: GEMINI_MODEL
+        sync: false
+
       # Set these to your Render URL once it is assigned, e.g.
       #   https://supportcue.onrender.com
       - key: FRONTEND_URL
