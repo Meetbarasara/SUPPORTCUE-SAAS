@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { io } from "socket.io-client";
-import { Send, X, MessageCircle, Bot, Shield, Sparkles } from "lucide-react";
+import { Send, X, MessageCircle, Bot, Shield, Sparkles, AlertCircle, RotateCw } from "lucide-react";
 import { chatAPI, customerAPI } from "../api/api";
 
 // Socket URL: in production, set VITE_SOCKET_URL in your frontend .env
@@ -16,6 +16,9 @@ const ChatWidget = ({ companyId, initialCustomerId, standalone }) => {
   const [chatMode, setChatMode] = useState("ai");
   const [chatStatus, setChatStatus] = useState("open");
   const [assignedAgent, setAssignedAgent] = useState(null);
+  // A failed init used to be console-only, leaving an enabled input whose send
+  // button silently did nothing — surface it instead.
+  const [initError, setInitError] = useState(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   // Prevent multiple simultaneous init calls
@@ -60,6 +63,7 @@ const ChatWidget = ({ companyId, initialCustomerId, standalone }) => {
   const initializeChat = async () => {
     if (initializingRef.current) return;
     initializingRef.current = true;
+    setInitError(null);
 
     try {
       const userId = getUserId();
@@ -173,9 +177,18 @@ const ChatWidget = ({ companyId, initialCustomerId, standalone }) => {
 
     } catch (error) {
       console.error("[Widget] Failed to initialize chat:", error);
+      setInitError(
+        error?.response?.data?.error ||
+        "We couldn't connect you to support. Please try again."
+      );
     } finally {
       initializingRef.current = false;
     }
+  };
+
+  const retryInit = () => {
+    setInitError(null);
+    initializeChat();
   };
 
   const sendMessage = () => {
@@ -208,6 +221,7 @@ const ChatWidget = ({ companyId, initialCustomerId, standalone }) => {
     new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   const isHuman = chatMode === "human";
+  const inputDisabled = chatStatus === "closed" || Boolean(initError);
 
   return (
     <div className={standalone ? "w-full h-full relative" : ""}>
@@ -276,6 +290,19 @@ const ChatWidget = ({ companyId, initialCustomerId, standalone }) => {
               );
             })}
 
+            {initError && (
+              <div className="flex flex-col items-center gap-2 text-center py-6 animate-fade-slide">
+                <AlertCircle className="h-5 w-5 text-amber-400" />
+                <p className="text-[12px] text-slate-400 max-w-[240px] leading-relaxed">{initError}</p>
+                <button
+                  onClick={retryInit}
+                  className="glass rounded-xl px-3 py-1.5 text-[12px] text-slate-200 inline-flex items-center gap-1.5 hover:bg-white/10 transition-colors"
+                >
+                  <RotateCw className="h-3 w-3" /> Try again
+                </button>
+              </div>
+            )}
+
             {isTyping && (
               <div className="flex items-end gap-2 animate-fade-slide">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isHuman ? "avatar-human" : "avatar-ai"}`}>
@@ -303,13 +330,19 @@ const ChatWidget = ({ companyId, initialCustomerId, standalone }) => {
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyPress={handleKeyPress}
                 onInput={handleTyping}
-                disabled={chatStatus === "closed"}
-                placeholder={chatStatus === "closed" ? "This chat has been closed." : "Type a message…"}
+                disabled={inputDisabled}
+                placeholder={
+                  chatStatus === "closed"
+                    ? "This chat has been closed."
+                    : initError
+                      ? "Not connected."
+                      : "Type a message…"
+                }
                 className="flex-1 bg-transparent px-3 py-1.5 text-[13px] text-slate-100 placeholder:text-slate-500 outline-none disabled:opacity-50"
               />
               <button
                 onClick={sendMessage}
-                disabled={!inputText.trim() || chatStatus === "closed"}
+                disabled={!inputText.trim() || inputDisabled}
                 className="btn-accent rounded-xl w-9 h-9 flex items-center justify-center disabled:opacity-40"
                 aria-label="Send"
               >

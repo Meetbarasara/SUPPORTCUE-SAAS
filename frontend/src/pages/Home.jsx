@@ -162,7 +162,11 @@ const Home = ({ user, onLogout }) => {
 
       <SiteFooter />
 
-      <ChatWidget companyId="6a4bad103f1b1249be0a067f" />
+      {/* No hardcoded tenant id: a pinned ObjectId only exists in the database it
+          was copied from, so the demo 404s on every other deployment. Omitting it
+          lets /api/customer/init resolve the company itself. Set
+          VITE_DEMO_COMPANY_ID to point the public demo at a specific tenant. */}
+      <ChatWidget companyId={import.meta.env.VITE_DEMO_COMPANY_ID || undefined} />
     </div>
   );
 };
