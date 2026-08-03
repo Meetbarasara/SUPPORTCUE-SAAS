@@ -19,6 +19,9 @@ services:
     buildCommand: cd frontend && npm install --include=dev && npm run build && cd ../backend && npm install --omit=dev
     startCommand: cd backend && node server.js
     healthCheckPath: /health
+    # Node version comes from `.node-version` at the repo root. An open-ended
+    # `engines.node` range (">=18") is resolved to the newest Node in existence,
+    # which Render cannot always install — that failed the build on 26.6.0.
     envVars:
       - key: NODE_ENV
         value: production
