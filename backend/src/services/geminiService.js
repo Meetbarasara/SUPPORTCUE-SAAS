@@ -151,11 +151,32 @@ class GeminiService {
             handoff_requested: parsed.handoff_requested === true
           };
         } catch (e) {
-          console.error('Failed to parse Gemini JSON:', e);
-          return {
-            answer: jsonText, // Fallback if not pure JSON
-            handoff_requested: false
-          };
+          // Unparseable output used to be handed to the customer verbatim, so a
+          // reply truncated mid-object arrived in the chat as a literal `{ "`.
+          // A thinking model that exhausts maxOutputTokens produces exactly
+          // that, which is how this path gets reached at all.
+          console.error('Failed to parse Gemini JSON:', e.message);
+
+          // A complete answer field inside otherwise-malformed JSON is still
+          // worth serving.
+          const field = jsonText.match(/"answer"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+          if (field) {
+            return {
+              answer: field[1].replace(/\\(.)/g, '$1'),
+              handoff_requested: /"handoff_requested"\s*:\s*true/.test(jsonText)
+            };
+          }
+
+          // Plain prose means the model ignored responseMimeType — usable as-is.
+          const trimmed = jsonText.trim();
+          if (!trimmed.startsWith('{') && trimmed.length > 20) {
+            return { answer: trimmed, handoff_requested: false };
+          }
+
+          // Anything else is a fragment of a protocol, not a sentence. Hand off
+          // rather than show it — a reply cut off mid-word reads worse to a
+          // customer than being passed to a person.
+          return this.getFallbackReply();
         }
       } else {
         throw new Error('Invalid response format from Gemini');
